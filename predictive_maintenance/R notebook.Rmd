@@ -1,0 +1,163 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+https://gallery.cortanaintelligence.com/Notebook/Predictive-Maintenance-Modelling-Guide-R-Notebook-1
+
+```{r}
+library("dplyr") # Data munging functions
+
+library("zoo")   # Feature engineering rolling aggregates
+library("data.table") # Feature engineering
+
+library("ggplot2") # Graphics
+library("scales") # For time formatted axis
+```
+
+```{r}
+Sys.setlocale(category = "LC_ALL", locale = "English_United States.1252")
+```
+
+```{r}
+# format datetime field which comes in as.character
+telemetry <- read.csv('telemetry.csv')
+telemetry$datetime <- as.POSIXct(telemetry$datetime,
+                                 format="%m/%d/%Y %I:%M:%S %p",
+                                 tz="UTC")
+
+cat("Total Number of telemetry records:", nrow(telemetry))
+range(telemetry$datetime)
+head(telemetry,10)
+tail(telemetry,10)
+summary(telemetry)
+```
+```{r}
+theme_set(theme_bw())  # theme for figures
+options(repr.plot.width = 8, repr.plot.height = 6)
+
+ggplot(data = telemetry %>% filter(machineID %in% 1:2, 
+                                 datetime > as.POSIXct("2015-01-01"),
+                                 datetime < as.POSIXct("2015-02-01")),
+       aes(x = datetime, y = volt, col = factor(machineID))) +
+  geom_line(alpha = 0.5) +
+  labs(y = "voltage", color = "machineID") +
+  facet_wrap(~machineID, ncol=1)
+```
+
+```{r}
+# download errors dataset
+errors <- read.csv('errors.csv')
+# format datetime and errorID fields
+errors$datetime <- as.POSIXct(errors$datetime,
+                              format="%m/%d/%Y %I:%M:%S %p", 
+                              tz="UTC")
+errors$errorID <- as.numeric(errors$errorID)
+
+cat("Total Number of error records:",nrow(errors))
+errors[c(1:5, nrow(errors)-4:1),]
+```
+
+```{r}
+options(repr.plot.width = 5, repr.plot.height = 3)
+ggplot(errors, aes(x = errorID)) + 
+    geom_histogram(fill = "orange", binwidth = 0.5) + 
+    labs(title = "Errors by type", x = "error types")
+```
+```{r}
+options(repr.plot.width = 6, repr.plot.height = 5)
+ggplot(errors %>% filter(machineID < 4), 
+       aes(x = errorID, fill = factor(machineID))) + 
+    geom_histogram(color = "black", binwidth = 0.5) + 
+    labs(title = "MachineID errors by type", x = "error types", fill="MachineID")+
+    facet_wrap(~machineID, ncol = 1)
+```
+```{r}
+options(repr.plot.width = 7, repr.plot.height = 5)
+ggplot(errors %>% filter(machineID == 4), 
+       aes(y = errorID, x = datetime)) + 
+    geom_point(color = "black", alpha = 0.5) + 
+    labs(title = "MachineID 4 errors", x = "Date")
+```
+```{r}
+maint<- read.csv('maint.csv')
+maint$datetime <- as.POSIXct(maint$datetime,
+                             format="%m/%d/%Y %I:%M:%S %p", 
+                             tz="UTC")
+maint$comp <- as.numeric(maint$comp)
+
+cat("Total number of maintenance records:", nrow(maint))
+range(maint$datetime)
+maint[c(1:5, nrow(maint)-4:0),]
+```
+
+```{r}
+options(repr.plot.width = 5, repr.plot.height = 3)
+ggplot(maint, aes(x = comp)) + 
+    geom_histogram(fill= "magenta", binwidth = 0.5) +
+    labs(title = "Component replacements", x = "component types")
+```
+```{r}
+options(repr.plot.width = 6, repr.plot.height = 8)
+ggplot(maint %>% filter(machineID < 4), 
+       aes(x = comp, fill = factor(machineID))) + 
+    geom_histogram(color = "black", binwidth = 0.5) +
+    labs(title = "Component replacements", x = "component types", fill = "Machine ID")+
+    facet_wrap(~machineID, ncol = 1)
+```
+
+```{r}
+options(repr.plot.width = 7, repr.plot.height = 5)
+ggplot(maint %>% filter(machineID == 4), 
+       aes(y = comp, x = datetime)) + 
+    geom_point(color = "black", alpha = 0.5) + 
+    labs(title = "MachineID 4 component replacements", x = "Date")
+
+```
+
+
+
+```{r}
+# format model field
+machines <- read.csv("machines.csv")
+machines$model <- as.numeric(machines$model)
+
+cat("Total number of machines:", nrow(machines))
+machines[c(1:5, nrow(machines)-4:0),]
+summary(machines)
+```
+
+```{r}
+options(repr.plot.width = 8, repr.plot.height = 6)
+ggplot(machines, aes(x = age, fill = model)) + 
+    geom_histogram(color = "black") + 
+    labs(title = "Machines", x = "age (years)") +
+    facet_wrap(~model)
+```
+```{r}
+failures <- read.csv("failures.csv")
+# format datetime and failure fields
+failures$datetime <- as.POSIXct(failures$datetime,
+                                format="%m/%d/%Y %I:%M:%S %p", 
+                                tz="UTC")
+failures$failure <- as.numeric(failures$failure)
+
+cat("Total number of failures:", nrow(failures))
+failures[c(1:5, nrow(failures)-4:0),]
+```
+
+```{r}
+options(repr.plot.width = 5, repr.plot.height = 3)
+ggplot(failures, aes(x = failure)) + 
+    geom_histogram(fill = "red", binwidth = 0.5) + 
+    labs(title = "Failure distribution", x = "component type")
+```
+
+```{r}
+options(repr.plot.width = 6, repr.plot.height = 6)
+ggplot(failures %>% filter(machineID < 4),
+       aes(x = failure, fill = factor(machineID))) + 
+    geom_histogram(color = "black", binwidth = 0.5) + 
+    labs(title = "Failure distribution", x = "component type", fill = "MachineID") +
+    facet_wrap(~machineID, ncol=1)
+```
+
